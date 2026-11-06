@@ -63,3 +63,34 @@ Las pruebas unitarias se ejecutaron con `mvn test` antes de cualquier refactoriz
 #### Decisión de Diseño 2: Enum polimórfico frente a jerarquía de clases de estrategia
 - **Elección:** Se transformó el enumerador `TipoProducto` en un enum con métodos abstractos implementados por cada constante (`LIBRO`, `ELECTRONICO`, etc.) en lugar de crear una jerarquía de clases con el patrón Strategy.
 - **Justificación:** El catálogo de tipos de producto representa una taxonomía cerrada y estable en este modelo de inventario. Los cálculos de recargo y etiquetado dependen exclusivamente del estado intrínseco del producto (su precio y nombre), sin requerir inyección de dependencias de Spring, acceso a repositorios ni servicios externos. Crear una interfaz y cuatro o más clases adicionales habría generado sobreingeniería (*Speculative Generality*). La solución con enum proporciona polimorfismo nativo en tiempo de compilación con cero sobrecosto de mantenimiento.
+
+---
+
+## Parte 2: Diagnóstico y Resolución de Acoplamiento entre Paquetes
+
+### 1. Diagnóstico del Acoplamiento Cíclico con ArchUnit
+
+Al integrar el módulo de `reportes`, se generó una dependencia circular entre paquetes:
+
+#### Diagrama de paquetes con ciclo (Antes):
+```text
+┌───────────────────────┐
+│  paquete: inventario  │
+└───────────┬───────────┘
+            │  ▲
+            │  │ (Dependencia circular)
+            ▼  │
+┌───────────┴───────────┐
+│   paquete: reportes   │
+└───────────────────────┘
+
+- inventario.InventarioService importa y utiliza reportes.ReporteBajoStockService.
+- reportes.ReporteBajoStockService importa y utiliza inventario.InventarioService.
+```
+
+##### Evidencia del fallo de la prueba de arquitectura (ArquitecturaPaquetesTest):
+java.lang.AssertionError: Architecture Violation [Priority: MEDIUM] - Rule 'slices matching ... should be free of cycles' was violated (1 times):
+Cycle detected:
+  Slice inventario ->
+  Slice reportes ->
+  Slice inventario

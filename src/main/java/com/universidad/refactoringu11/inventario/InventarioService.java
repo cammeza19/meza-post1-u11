@@ -1,21 +1,29 @@
 package com.universidad.refactoringu11.inventario;
 
-import java.util.ArrayList;
+import java.util.ArrayList; // Inventario ahora importa reportes (origina el ciclo)
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import com.universidad.refactoringu11.reportes.ReporteBajoStockService;
 
 @Service
 public class InventarioService {
 
     private final List<Producto> productos = new ArrayList<>();
     private final List<String> movimientos = new ArrayList<>();
+    private ReporteBajoStockService reporteBajoStockService; // Colaborador opcional
+
+    @Autowired(required = false)
+    public void setReporteBajoStockService(ReporteBajoStockService reporteBajoStockService) {
+        this.reporteBajoStockService = reporteBajoStockService;
+    }
 
     public void agregarProducto(Producto producto) {
         productos.add(producto);
     }
 
-    // Metodo principal refactorizado: orquesta delegando en metodos intencionales (<= 10 lineas)
     public String actualizarInventario(Long productoId, int cantidad, String tipoMovimiento) {
         if (esEntradaInvalida(productoId, cantidad, tipoMovimiento)) return "ERROR_DATOS_INVALIDOS";
         Producto producto = buscarProducto(productoId);
@@ -61,6 +69,12 @@ public class InventarioService {
     private String procesarAlertaOResultado(Producto producto, int nuevoStock) {
         if (CalculadoraReorden.necesitaReorden(nuevoStock, producto.getStockMinimo())) {
             int cantidadReorden = CalculadoraReorden.calcularCantidad(nuevoStock, producto.getStockMinimo());
+            
+            // Si el servicio de reportes esta presente, lo notificamos
+            if (reporteBajoStockService != null) {
+                System.out.println(reporteBajoStockService.generarReporte());
+            }
+
             System.out.println("ALERTA: " + producto.getNombre()
                     + " bajo stock minimo. Reordenar " + cantidadReorden + " unidades.");
             return "OK_BAJO_STOCK_REORDEN_" + cantidadReorden;

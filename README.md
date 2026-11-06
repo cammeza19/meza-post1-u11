@@ -74,12 +74,13 @@ refactoring-u11/
 | 7 | `test: agregar prueba de arquitectura que detecta ciclo entre inventario y reportes (en rojo)` | 2 | Diagnóstico: ArchUnit en **rojo** |
 | 8 | `refactor: invertir la dependencia entre inventario y reportes extrayendo NotificadorBajoStock` | 2 | Ciclo resuelto con DIP: ArchUnit en **verde** |
 | 9 | `docs: agregar capturas de pantalla de evidencias al README` | 2 | Evidencias visuales |
-| 10 | `docs: completar README con diagrama de paquetes antes/despues y decisiones de la Parte 2` | 2 | README consolidado final |
+| 10 | `refactor: limpiar comentarios residuales, sellar CalculadoraReorden y romper ciclo de beans con @Lazy` | 2 | Limpieza final de estilo y corrección del ciclo de beans de Spring |
+| 11 | `docs: completar README con diagrama de paquetes antes/despues y decisiones de la Parte 2` | 2 | README consolidado final |
 
 Las pruebas de caracterización (`src/test/.../inventario/`) **no se modificaron** después del commit 2. Se puede verificar con:
 
 ```bash
-git diff <hash-commit-2> HEAD -- src/test/java/com/universidad/refactoringu11/inventario
+git diff ce1ed72 HEAD -- src/test/java/com/universidad/refactoringu11/inventario
 # (salida vacía = sin modificaciones)
 ```
 
@@ -283,6 +284,7 @@ Al integrar el paquete `reportes`, `InventarioService` empezó a notificar el ba
 ```text
 $ mvn test -Dtest=ArquitecturaPaquetesTest
 
+Architecture Violation [Priority: MEDIUM] - Rule 'slices matching 'com.universidad.refactoringu11.(*)..' should be free of cycles' was violated (1 times):
 Cycle detected: Slice inventario ->
                 Slice reportes ->
                 Slice inventario
@@ -304,7 +306,7 @@ Cycle detected: Slice inventario ->
 
 #### Las pruebas de negocio siguen en verde a pesar del ciclo
 
-Ejecutando la suite completa en el commit de la prueba en rojo (`git checkout <hash-commit-7> && mvn test`), las 12 pruebas de caracterización pasan y solo falla la de arquitectura. Esto confirma que el *smell* es estructural y que ninguna prueba de comportamiento lo habría detectado:
+Ejecutando la suite completa en el commit de la prueba en rojo (`git checkout debc02e && mvn test`), las 12 pruebas de caracterización pasan y solo falla la de arquitectura. Esto confirma que el *smell* es estructural y que ninguna prueba de comportamiento lo habría detectado:
 
 ```text
 [ERROR] Tests run: 13, Failures: 1, Errors: 0, Skipped: 0
@@ -330,6 +332,8 @@ public interface NotificadorBajoStock {
 - `InventarioService` depende solo de la interfaz (inyección opcional por setter con `@Autowired(required = false)`, para no alterar el constructor sin argumentos que usan las pruebas de la Parte 1).
 - `ReporteBajoStockService` **implementa** `NotificadorBajoStock` y acumula las alertas recibidas para su reporte.
 - `InventarioService` ya no contiene ningún `import com.universidad.refactoringu11.reportes.*`.
+
+> **Ciclo a nivel de beans (commit 10).** Al eliminar el ciclo entre paquetes queda un ciclo distinto, en tiempo de ejecución, entre beans de Spring: `ReporteBajoStockService` recibe `InventarioService` por constructor, e `InventarioService` recibe el `NotificadorBajoStock` por setter. Spring Boot 3 prohíbe por defecto las referencias circulares, así que se anotó el parámetro del constructor con `@Lazy`: Spring inyecta un proxy que resuelve `InventarioService` en su primer uso. Esto no afecta la dirección de las dependencias de paquetes (`reportes → inventario`), por lo que `ArquitecturaPaquetesTest` sigue en verde.
 
 #### Diagrama de paquetes DESPUÉS (sin ciclo)
 
@@ -452,7 +456,8 @@ $ mvn test
 | Tras refactorizar el Long Method (commit 3) | 12/12 | — |
 | Tras refactorizar los switch (commit 4) | 12/12 | — |
 | Con el módulo de reportes y el ciclo (commit 7) | 12/12 | ciclo detectado |
-| Tras invertir la dependencia (commit 8, final) | 12/12 | sin ciclos |
+| Tras invertir la dependencia (commit 8) | 12/12 | sin ciclos |
+| Tras la limpieza final (commit 10, estado final) | 12/12 | sin ciclos |
 
 ---
 
